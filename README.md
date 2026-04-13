@@ -1,6 +1,6 @@
 # University Attendance Management App
 
-A complete mobile attendance management system for universities built with React Native, Expo, and Supabase. Features role-based authentication for Faculty and Students, offline sync, QR code attendance, and comprehensive reporting.
+A complete mobile attendance management system for universities built with React Native, Expo SDK 55, and Convex DB. Features role-based authentication for Faculty, Students, and Admins, offline sync, QR code attendance, and comprehensive reporting.
 
 ## Features
 
@@ -12,6 +12,7 @@ A complete mobile attendance management system for universities built with React
 - ✅ Generate PDF and Excel reports
 - ✅ Real-time attendance tracking
 - ✅ Offline support with auto-sync
+- ✅ Announcements & assignment management
 
 ### For Students
 - ✅ View overall attendance percentage
@@ -21,22 +22,28 @@ A complete mobile attendance management system for universities built with React
 - ✅ Export personal attendance reports
 - ✅ Low attendance warnings
 
+### For Admins
+- ✅ Dashboard with total user/subject statistics
+- ✅ Create and manage users (faculty, students, admins)
+- ✅ Create and manage subjects
+- ✅ Assign faculty to subjects
+
 ## Tech Stack
 
 ### Frontend
-- **Framework**: React Native 0.81.4 with Expo SDK 54
+- **Framework**: React Native 0.83.2 with Expo SDK 55
 - **UI Library**: React Native Paper (Material Design)
 - **Navigation**: Expo Router (file-based routing)
 - **State Management**: React Context API
 - **Local Storage**: AsyncStorage for offline data
-- **Camera**: expo-camera + expo-barcode-scanner for QR codes
+- **Camera**: expo-camera for QR codes
 - **Fonts**: Google Fonts (Poppins family)
 
 ### Backend & Database
-- **Backend**: Supabase (PostgreSQL)
-- **Authentication**: Supabase Auth with Row Level Security
-- **Real-time**: Supabase Realtime subscriptions
-- **Storage**: Supabase Storage
+- **Backend**: [Convex](https://convex.dev) (real-time document database)
+- **Authentication**: Convex Auth (`@convex-dev/auth`) with email/password provider
+- **Server Functions**: Convex queries, mutations, and actions (TypeScript)
+- **Access Control**: Enforced in server functions (replaces Supabase RLS)
 
 ### Additional Libraries
 - date-fns - Date handling
@@ -44,131 +51,62 @@ A complete mobile attendance management system for universities built with React
 - @react-native-community/netinfo - Network detection
 - expo-linear-gradient - UI gradients
 - react-native-svg - SVG rendering
+- xlsx - Excel export
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+ installed
+- Node.js 20.19+ installed
 - Expo CLI (`npm install -g expo-cli`)
-- Supabase account (free tier available)
 - Android Studio or Xcode for testing (or use Expo Go)
 
 ### 1. Clone and Install
 
 ```bash
-cd attendance-app
+git clone https://github.com/codedecoyz/Attandance-Expo-App.git
+cd Attandance-Expo-App
 npm install
 ```
 
-### 2. Set Up Supabase
+### 2. Set Up Convex
 
-1. Create a new project at [supabase.com](https://supabase.com)
-2. Copy your project URL and anon key
-3. Update `.env` file:
+Start the Convex development server — it will prompt you to create an account or run locally:
 
 ```bash
-EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+npx convex dev
 ```
 
-### 3. Set Up Database
+This will:
+- Download the Convex backend binary
+- Create your schema with all 10 tables and indexes
+- Deploy all server functions (queries, mutations)
+- Generate type-safe API bindings in `convex/_generated/`
+- Create a `.env.local` file with your `EXPO_PUBLIC_CONVEX_URL`
 
-1. Open your Supabase project's SQL Editor
-2. Copy the contents of `scripts/database-schema.sql`
-3. Paste and run the script in the SQL Editor
-4. This will create all tables, indexes, RLS policies, and functions
+> **Note**: Keep `npx convex dev` running in a separate terminal while developing.
 
-### 4. Create Test Users
+### 3. Create Test Users
 
-Since registration is admin-only, create test users through Supabase:
+Since the database starts empty, the first sign-in for any email will automatically create an account. To set up proper user roles, use the admin flow:
 
-#### Create Faculty User
-1. Go to Authentication > Users in Supabase dashboard
-2. Click "Add user" → Create user manually
-3. Set email and password (e.g., `faculty@test.com` / `test123`)
-4. Note the user ID from the created user
-5. Run in SQL Editor:
+1. Start the app and sign in with any email/password — this creates a default user
+2. Use the Convex dashboard (`npx convex dashboard`) to manually set the first user's role to `admin`
+3. Sign in as admin and use the **Add User** screen to create faculty and student accounts
 
-```sql
--- Insert into users table
-INSERT INTO users (id, email, full_name, role, password_hash)
-VALUES (
-  'paste-user-id-here',
-  'faculty@test.com',
-  'Dr. John Smith',
-  'faculty',
-  'hash-from-auth'  -- This is handled by Supabase Auth
-);
-
--- Insert into faculty table
-INSERT INTO faculty (id, employee_id, department, phone)
-VALUES (
-  'paste-same-user-id',
-  'FAC001',
-  'Computer Science',
-  '1234567890'
-);
-
--- Create a test subject
-INSERT INTO subjects (subject_code, subject_name, faculty_id, semester, department, schedule)
-VALUES (
-  'CS101',
-  'Introduction to Programming',
-  'paste-faculty-id',
-  1,
-  'Computer Science',
-  'MWF 10:00 AM'
-);
-```
-
-#### Create Student User
-1. Follow same steps for creating student
-2. Use email like `student@test.com`
-3. Run in SQL Editor:
-
-```sql
--- Insert into users table
-INSERT INTO users (id, email, full_name, role, password_hash)
-VALUES (
-  'paste-student-user-id',
-  'student@test.com',
-  'Alice Johnson',
-  'student',
-  'hash-from-auth'
-);
-
--- Insert into students table
-INSERT INTO students (id, roll_number, enrollment_year, semester, department, phone)
-VALUES (
-  'paste-same-user-id',
-  'CS2024001',
-  2024,
-  1,
-  'Computer Science',
-  '0987654321'
-);
-
--- Enroll student in subject
-INSERT INTO enrollments (student_id, subject_id)
-VALUES (
-  'paste-student-id',
-  'paste-subject-id'  -- Get from subjects table
-);
-```
-
-### 5. Run the App
+### 4. Run the App
 
 ```bash
-# Start Expo development server
+# Start Expo development server (in a second terminal)
 npx expo start
+
+# Run on Web
+npx expo start --web
 
 # Run on Android
 npx expo start --android
 
 # Run on iOS
 npx expo start --ios
-
-# Run in Expo Go (scan QR code with phone)
 ```
 
 ## Project Structure
@@ -176,10 +114,14 @@ npx expo start --ios
 ```
 attendance-app/
 ├── app/                          # Expo Router screens
-│   ├── _layout.tsx               # Root layout with auth provider
+│   ├── _layout.tsx               # Root layout (ConvexProvider + AuthProvider)
 │   ├── (auth)/                   # Authentication screens
 │   │   ├── login.tsx
 │   │   └── forgot-password.tsx
+│   ├── (admin)/                  # Admin screens
+│   │   ├── dashboard.tsx
+│   │   ├── users/
+│   │   └── subjects/
 │   ├── (faculty)/                # Faculty screens
 │   │   └── (tabs)/
 │   │       ├── index.tsx         # Dashboard
@@ -195,26 +137,37 @@ attendance-app/
 ├── components/                   # Reusable components
 │   ├── common/                   # Button, Card, Input, etc.
 │   ├── dashboard/                # StatCard, SubjectCard, ProgressCircle
-│   └── attendance/               # Attendance-specific components
+│   ├── attendance/               # Attendance-specific components
+│   └── AdminGuard.tsx            # Admin role guard
 ├── contexts/                     # React contexts
-│   ├── AuthContext.tsx           # Authentication state
+│   ├── AuthContext.tsx           # Authentication state (Convex Auth)
 │   └── OfflineContext.tsx        # Offline sync state
-├── services/                     # Business logic
-│   ├── authService.ts
-│   ├── attendanceService.ts
-│   ├── subjectService.ts
-│   └── qrService.ts
+├── convex/                       # Convex backend (server-side)
+│   ├── schema.ts                 # Database schema (10 tables)
+│   ├── auth.ts                   # Auth configuration
+│   ├── http.ts                   # HTTP router for auth
+│   ├── users.ts                  # User queries & mutations
+│   ├── attendance.ts             # Attendance CRUD & stats
+│   ├── subjects.ts               # Subject queries & mutations
+│   ├── qrSessions.ts             # QR session logic
+│   ├── announcements.ts          # Announcement CRUD
+│   └── assignments.ts            # Assignment & marks CRUD
+├── services/                     # Client-side service layer
+│   ├── authService.ts            # Auth compatibility layer
+│   ├── attendanceService.ts      # Attendance operations
+│   ├── subjectService.ts         # Subject operations
+│   ├── qrService.ts              # QR code operations
+│   ├── announcementService.ts    # Announcement operations
+│   ├── assignmentService.ts      # Assignment operations
+│   └── exportService.ts          # PDF/Excel export
 ├── lib/                          # Utilities
-│   ├── supabase.ts               # Supabase client
+│   ├── convex.ts                 # Convex client initialization
 │   ├── constants.ts              # App constants
 │   └── utils.ts                  # Helper functions
-├── styles/                       # Global styles
-│   └── theme.ts                  # Colors, typography, spacing
 ├── types/                        # TypeScript types
-│   ├── database.ts               # Supabase table types
+│   ├── database.ts               # Table interfaces
 │   └── models.ts                 # App models
-└── scripts/                      # Utility scripts
-    └── database-schema.sql       # Database setup
+└── scripts/                      # Legacy SQL scripts (archived)
 ```
 
 ## Design System
@@ -234,10 +187,10 @@ attendance-app/
 ## Key Features Implementation
 
 ### 1. Authentication Flow
-- Role-based navigation (Faculty vs Student)
-- Supabase Auth with Row Level Security
-- Automatic token refresh
-- Secure session management
+- Role-based navigation (Admin / Faculty / Student)
+- Convex Auth with email/password provider
+- Automatic account creation on first sign-in
+- Secure session management via `@convex-dev/auth`
 
 ### 2. Offline Sync
 - Queue operations in AsyncStorage when offline
@@ -257,65 +210,86 @@ attendance-app/
 - Overall and subject-wise percentages
 - Color-coded indicators (>80% green, 60-80% orange, <60% red)
 
+### 5. Convex Server Functions
+All business logic runs server-side in TypeScript:
+- **Queries** — reactive, auto-update UI when data changes
+- **Mutations** — transactional writes with validation
+- **Access control** — enforced in every function (replaces Supabase RLS)
+
 ## Database Schema
 
-The app uses 7 main tables:
-- `users` - User accounts with roles
-- `faculty` - Faculty-specific data
-- `students` - Student-specific data
-- `subjects` - Courses/subjects
-- `enrollments` - Student-subject mapping
-- `attendance_records` - Attendance data
-- `qr_sessions` - Temporary QR tokens
+The app uses 10 tables defined in `convex/schema.ts`:
 
-See `scripts/database-schema.sql` for complete schema with indexes, RLS policies, and functions.
+| Table | Purpose |
+|-------|---------|
+| `users` | User accounts with roles (faculty/student/admin) |
+| `faculty` | Faculty profiles (employee ID, department) |
+| `students` | Student profiles (roll number, semester) |
+| `subjects` | Courses with faculty assignment |
+| `enrollments` | Student ↔ Subject mapping |
+| `attendanceRecords` | Daily attendance entries |
+| `qrSessions` | Temporary QR attendance tokens |
+| `announcements` | Faculty announcements per subject |
+| `assignments` | Assignment definitions |
+| `assignmentMarks` | Student marks per assignment |
+
+Plus Convex Auth tables (`authAccounts`, `authSessions`, `authRefreshTokens`, etc.) managed automatically.
 
 ## Environment Variables
 
-Required in `.env`:
+The Convex URL is auto-configured in `.env.local` when you run `npx convex dev`:
 ```
-EXPO_PUBLIC_SUPABASE_URL=your-supabase-url
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+EXPO_PUBLIC_CONVEX_URL=http://127.0.0.1:3210
+```
+
+For production deployment, set it to your Convex cloud URL:
+```
+EXPO_PUBLIC_CONVEX_URL=https://your-project.convex.cloud
 ```
 
 ## Testing
 
 ### Test Login Credentials
-After creating test users:
-- Faculty: `faculty@test.com` / `test123`
-- Student: `student@test.com` / `test123`
+After creating test users via the admin panel:
+- Admin: `admin@test.com` / `password123`
+- Faculty: `faculty@test.com` / `password123`
+- Student: `student@test.com` / `password123`
 
 ### Test Flows
-1. **Faculty marks attendance**:
+1. **Admin creates users**:
+   - Login as admin → Dashboard → Add New User → Create faculty/student accounts
+
+2. **Faculty marks attendance**:
    - Login as faculty → View dashboard → See assigned subjects
    - Navigate to Mark Attendance → Select subject and date
    - Mark students present/absent → Save
 
-2. **Student views attendance**:
+3. **Student views attendance**:
    - Login as student → View dashboard → See attendance percentage
    - Tap on subject → View detailed attendance history
 
-3. **QR Code attendance**:
+4. **QR Code attendance**:
    - Faculty generates QR → Student scans → Attendance marked automatically
 
 ## Troubleshooting
 
 ### Common Issues
 
-**1. "Module not found" errors**
+**1. "Cannot find module convex/_generated/api"**
 ```bash
-npx expo install --check
+# Make sure Convex dev server is running
+npx convex dev
 ```
 
-**2. Supabase connection issues**
-- Check `.env` file has correct credentials
-- Verify Supabase project is active
-- Check RLS policies are enabled
+**2. Convex connection issues**
+- Ensure `npx convex dev` is running in a separate terminal
+- Check `.env.local` has the correct `EXPO_PUBLIC_CONVEX_URL`
+- For local development, it should be `http://127.0.0.1:3210`
 
 **3. Authentication errors**
-- Ensure users table has matching auth.users entries
-- Verify RLS policies allow access
-- Check role field is set correctly
+- First sign-in auto-creates an account (signUp fallback)
+- If role is wrong, update it via `npx convex dashboard`
+- Ensure the user record exists in the `users` table
 
 **4. Build errors**
 ```bash
@@ -325,26 +299,24 @@ npx expo start -c
 # Reinstall dependencies
 rm -rf node_modules
 npm install
+
+# Regenerate Convex types
+npx convex dev
 ```
 
 ## Building for Production
 
+### Deploy Convex to Cloud
+```bash
+npx convex deploy
+```
+
 ### Android APK
 ```bash
-# Install EAS CLI
 npm install -g eas-cli
-
-# Login
 eas login
-
-# Configure build
 eas build:configure
-
-# Build APK
 eas build --platform android --profile preview
-
-# Build for Google Play
-eas build --platform android --profile production
 ```
 
 ### iOS IPA
@@ -352,17 +324,16 @@ eas build --platform android --profile production
 eas build --platform ios --profile production
 ```
 
-## Future Enhancements
+## Migration Note
 
-- [ ] Mark Attendance screen with student selection
-- [ ] QR Code generation with countdown timer
-- [ ] QR Scanner with camera permissions
-- [ ] Subject detail screens with attendance history
-- [ ] PDF and Excel report generation
-- [ ] Push notifications for low attendance
-- [ ] Calendar view for students
-- [ ] Biometric authentication
-- [ ] Multi-language support
+This app was originally built with Supabase (PostgreSQL + Supabase Auth + RLS policies). It has been fully migrated to Convex DB. The `scripts/` directory contains the legacy SQL files for reference only — they are no longer used.
+
+Key migration changes:
+- Supabase client → Convex client (`lib/convex.ts`)
+- Supabase Auth → `@convex-dev/auth` with password provider
+- SQL RPC functions → Convex server functions (`convex/*.ts`)
+- Row Level Security → Access control in server functions
+- PostgreSQL queries → Convex document queries with indexes
 
 ## License
 
@@ -372,17 +343,17 @@ MIT License - feel free to use for educational purposes.
 
 For issues or questions:
 1. Check the troubleshooting section
-2. Review Supabase documentation
-3. Check Expo documentation
+2. Review [Convex documentation](https://docs.convex.dev)
+3. Check [Expo documentation](https://docs.expo.dev)
 4. Open an issue in the repository
 
 ## Credits
 
 Built with:
-- React Native & Expo
-- Supabase
-- React Native Paper
-- Expo Router
+- [React Native](https://reactnative.dev) & [Expo SDK 55](https://expo.dev)
+- [Convex](https://convex.dev)
+- [React Native Paper](https://callstack.github.io/react-native-paper/)
+- [Expo Router](https://expo.github.io/router)
 
 ---
 
