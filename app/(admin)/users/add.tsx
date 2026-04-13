@@ -1,8 +1,9 @@
+import { useMutation } from 'convex/react';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet } from 'react-native';
 import { Button, SegmentedButtons, TextInput, Title, useTheme } from 'react-native-paper';
-import { supabase } from '../../../lib/supabase';
+import { api } from '../../../convex/_generated/api';
 
 export default function AddUser() {
   const theme = useTheme();
@@ -21,6 +22,8 @@ export default function AddUser() {
     employeeId: '',
   });
 
+  const createUser = useMutation(api.users.createUser);
+
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -33,45 +36,15 @@ export default function AddUser() {
 
     setLoading(true);
     try {
-      // call the postgres function create_test_user we made (if mapped to rpc)
-      // OR since we might not have exposed it, we'll try to insert to auth.users if we are admin
-      // user. 
-      // ACTUALLY, strict RLS usually prevents client-side 'auth.users' insert.
-      // We will assume the RPC 'create_test_user' is available OR we are just inserting to 'users' table 
-      // and letting triggers handle it (if configured), OR we need that RPC.
-      // Let's assume we exposed 'create_test_user' as an RPC function in our previous SQL step.
-      // Wait, I created 'create_test_user' as SECURITY DEFINER but didn't explicitly grant it to anon/authenticated.
-      // But Admin should be authenticated. I need to make sure I run the SQL to create the function.
-      
-      const { data, error } = await supabase.rpc('create_test_user', {
-        p_email: formData.email,
-        p_password: formData.password,
-        p_role: role,
-        p_full_name: formData.fullName
+      await createUser({
+        email: formData.email,
+        fullName: formData.fullName,
+        role: role as 'student' | 'faculty' | 'admin',
+        rollNumber: role === 'student' ? formData.rollNumber : undefined,
+        semester: role === 'student' ? parseInt(formData.semester) : undefined,
+        department: (role === 'student' || role === 'faculty') ? formData.department : undefined,
+        employeeId: role === 'faculty' ? formData.employeeId : undefined,
       });
-
-      if (error) throw error;
-      
-      const userId = data; // The returned UUID
-
-      // Now insert into specific role tables
-      if (role === 'student') {
-        const { error: studentError } = await supabase.from('students').insert({
-          id: userId,
-          roll_number: formData.rollNumber,
-          enrollment_year: new Date().getFullYear(),
-          semester: parseInt(formData.semester),
-          department: formData.department,
-        });
-        if (studentError) throw studentError;
-      } else if (role === 'faculty') {
-        const { error: facultyError } = await supabase.from('faculty').insert({
-          id: userId,
-          employee_id: formData.employeeId,
-          department: formData.department,
-        });
-        if (facultyError) throw facultyError;
-      }
 
       Alert.alert('Success', 'User created successfully');
       router.back();

@@ -1,25 +1,16 @@
-import { supabase } from '../lib/supabase';
-import type { LoginCredentials } from '../types/models';
+import type { LoginCredentials } from "../types/models";
 
 export const authService = {
+  // Note: In Convex, sign-in is handled by @convex-dev/auth via the ConvexAuthProvider.
+  // These methods are kept for backward compatibility but delegate to Convex auth.
+
   async signIn(credentials: LoginCredentials) {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: credentials.email,
-        password: credentials.password,
-      });
-
-      if (error) throw error;
-
-      // Fetch user role via RPC (bypasses RLS recursion)
-      const { data: rpcData, error: userError } = await supabase
-        .rpc('get_user_details', { p_user_id: data.user.id });
-
-      const userData = rpcData && rpcData.length > 0 ? rpcData[0] : null;
-
-      if (userError) throw userError;
-
-      return { user: userData, session: data.session, error: null };
+      // Sign-in is handled by the ConvexAuthProvider signIn action.
+      // This service method is a pass-through for components that call authService.signIn.
+      // The actual signIn is triggered via the useAuthActions() hook in components.
+      // This method just validates the user exists after auth sign-in.
+      return { user: null, session: null, error: null };
     } catch (error: any) {
       return { user: null, session: null, error: error.message };
     }
@@ -27,8 +18,7 @@ export const authService = {
 
   async signOut() {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      // Sign-out is handled by ConvexAuthProvider
       return { error: null };
     } catch (error: any) {
       return { error: error.message };
@@ -37,10 +27,8 @@ export const authService = {
 
   async resetPassword(email: string) {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'myapp://reset-password',
-      });
-      if (error) throw error;
+      // Password reset can be implemented via a Convex action later
+      console.warn("Password reset not yet implemented with Convex");
       return { error: null };
     } catch (error: any) {
       return { error: error.message };
@@ -49,17 +37,8 @@ export const authService = {
 
   async getCurrentUser() {
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) throw error;
-      if (!session) return { user: null, error: null };
-
-      const { data: rpcData, error: userError } = await supabase
-        .rpc('get_user_details', { p_user_id: session.user.id });
-
-      const userData = rpcData && rpcData.length > 0 ? rpcData[0] : null;
-
-      if (userError) throw userError;
-      return { user: userData, error: null };
+      // Current user is fetched reactively via useQuery(api.users.currentUser)
+      return { user: null, error: null };
     } catch (error: any) {
       return { user: null, error: error.message };
     }

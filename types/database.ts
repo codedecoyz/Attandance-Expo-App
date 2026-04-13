@@ -1,4 +1,4 @@
-// Database Types for Supabase Tables
+// Database Types for Convex Tables
 
 export interface User {
   id: string;

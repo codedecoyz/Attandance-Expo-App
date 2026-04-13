@@ -1,4 +1,6 @@
+import { ConvexAuthProvider } from '@convex-dev/auth/react';
 import { Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold, useFonts } from '@expo-google-fonts/poppins';
+import { ConvexProvider } from 'convex/react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -7,6 +9,7 @@ import 'react-native-reanimated';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { OfflineProvider } from '../contexts/OfflineContext';
+import { convex } from '../lib/convex';
 
 // Keep splash screen visible while loading fonts
 SplashScreen.preventAutoHideAsync();
@@ -73,11 +76,15 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <OfflineProvider>
-        <RootLayoutNav />
-        <StatusBar style="auto" />
-      </OfflineProvider>
-    </AuthProvider>
+    <ConvexProvider client={convex}>
+      <ConvexAuthProvider client={convex}>
+        <AuthProvider>
+          <OfflineProvider>
+            <RootLayoutNav />
+            <StatusBar style="auto" />
+          </OfflineProvider>
+        </AuthProvider>
+      </ConvexAuthProvider>
+    </ConvexProvider>
   );
 }

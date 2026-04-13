@@ -1,46 +1,29 @@
-import { useRouter, useSegments } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 export function AdminGuard({ children }: { children: React.ReactNode }) {
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const { user, userRole, loading } = useAuth();
   const router = useRouter();
-  const segments = useSegments();
 
   useEffect(() => {
-    checkAdminStatus();
-  }, []);
-
-  async function checkAdminStatus() {
-    const { data: { user } } = await supabase.auth.getUser();
+    if (loading) return;
 
     if (!user) {
       router.replace('/(auth)/login');
       return;
     }
 
-    // Check role in public.users table
-    const { data, error } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (error || !data || data.role !== 'admin') {
-      console.log('User is not admin:', data?.role);
-      // Redirect to appropriate dashboard based on actual role or back to login
-      if (data?.role === 'student') router.replace('/(student)/(tabs)/dashboard');
-      else if (data?.role === 'faculty') router.replace('/(faculty)/(tabs)/dashboard');
+    if (userRole !== 'admin') {
+      console.log('User is not admin:', userRole);
+      if (userRole === 'student') router.replace('/(student)/(tabs)/dashboard');
+      else if (userRole === 'faculty') router.replace('/(faculty)/(tabs)/dashboard');
       else router.replace('/(auth)/login');
-      
-      setIsAdmin(false);
-    } else {
-      setIsAdmin(true);
     }
-  }
+  }, [user, userRole, loading]);
 
-  if (isAdmin === null) {
+  if (loading || !user) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#0000ff" />
@@ -48,5 +31,5 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return isAdmin ? <>{children}</> : null;
+  return userRole === 'admin' ? <>{children}</> : null;
 }

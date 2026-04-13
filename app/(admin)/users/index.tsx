@@ -1,42 +1,25 @@
+import { useQuery } from 'convex/react';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { Chip, FAB, List, Searchbar, Text, useTheme } from 'react-native-paper';
-import { supabase } from '../../../lib/supabase';
+import { api } from '../../../convex/_generated/api';
 
 export default function UsersList() {
   const theme = useTheme();
   const router = useRouter();
-  const [users, setUsers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all'); // all, student, faculty
 
-  useEffect(() => {
-    fetchUsers();
-  }, [filter]); // Re-fetch when filter changes
-
-  async function fetchUsers() {
-    let query = supabase.from('users').select('*').order('created_at', { ascending: false });
-    
-    if (filter !== 'all') {
-      query = query.eq('role', filter);
-    }
-    
-    // Simple client-side search or could add .ilike('email', `%${searchQuery}%`) if RLS permits
-    const { data, error } = await query;
-    
-    if (error) {
-      console.error('Error fetching users:', error);
-    } else {
-      setUsers(data || []);
-    }
-  }
+  const users = useQuery(api.users.listUsers, {
+    role: filter === 'all' ? undefined : filter,
+  }) ?? [];
 
   const onChangeSearch = (query: string) => setSearchQuery(query);
 
   const filteredUsers = users.filter(user => 
     user.email.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    user.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
+    user.fullName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -74,14 +57,14 @@ export default function UsersList() {
 
       <FlatList
         data={filteredUsers}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
           <List.Item
-            title={item.full_name || 'No Name'}
+            title={item.fullName || 'No Name'}
             description={item.email}
             left={props => <List.Icon {...props} icon={item.role === 'student' ? 'school' : 'briefcase'} />}
             right={props => <Text {...props} style={{ alignSelf: 'center', color: theme.colors.secondary }}>{item.role}</Text>}
-            onPress={() => console.log('View user', item.id)} // Could navigate to edit
+            onPress={() => console.log('View user', item._id)}
           />
         )}
       />

@@ -1,37 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from 'convex/react';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Paragraph, Title, useTheme } from 'react-native-paper';
-import { supabase } from '../../lib/supabase';
+import { api } from '../../convex/_generated/api';
 
 export default function AdminDashboard() {
   const theme = useTheme();
   const router = useRouter();
-  const [stats, setStats] = useState({
-    users: 0,
-    students: 0,
-    faculty: 0,
-    subjects: 0,
-  });
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  async function fetchStats() {
-    const { count: usersCount } = await supabase.from('users').select('*', { count: 'exact', head: true });
-    const { count: studentsCount } = await supabase.from('students').select('*', { count: 'exact', head: true });
-    const { count: facultyCount } = await supabase.from('faculty').select('*', { count: 'exact', head: true });
-    const { count: subjectsCount } = await supabase.from('subjects').select('*', { count: 'exact', head: true });
-
-    setStats({
-      users: usersCount || 0,
-      students: studentsCount || 0,
-      faculty: facultyCount || 0,
-      subjects: subjectsCount || 0,
-    });
-  }
+  const usersCount = useQuery(api.users.countUsers) ?? 0;
+  const studentsCount = useQuery(api.users.countStudents) ?? 0;
+  const facultyCount = useQuery(api.users.countFaculty) ?? 0;
+  const subjectsCount = useQuery(api.users.countSubjects) ?? 0;
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -44,7 +25,7 @@ export default function AdminDashboard() {
         <Card style={styles.card}>
           <Card.Content>
             <Ionicons name="people" size={24} color={theme.colors.primary} />
-            <Title>{stats.users}</Title>
+            <Title>{usersCount}</Title>
             <Paragraph>Total Users</Paragraph>
           </Card.Content>
         </Card>
@@ -52,7 +33,7 @@ export default function AdminDashboard() {
         <Card style={styles.card}>
           <Card.Content>
             <Ionicons name="school" size={24} color={theme.colors.secondary} />
-            <Title>{stats.students}</Title>
+            <Title>{studentsCount}</Title>
             <Paragraph>Students</Paragraph>
           </Card.Content>
         </Card>
@@ -60,7 +41,7 @@ export default function AdminDashboard() {
         <Card style={styles.card}>
           <Card.Content>
             <Ionicons name="briefcase" size={24} color={theme.colors.error} />
-            <Title>{stats.faculty}</Title>
+            <Title>{facultyCount}</Title>
             <Paragraph>Faculty</Paragraph>
           </Card.Content>
         </Card>
@@ -68,7 +49,7 @@ export default function AdminDashboard() {
         <Card style={styles.card}>
           <Card.Content>
             <Ionicons name="book" size={24} color={theme.colors.tertiary} />
-            <Title>{stats.subjects}</Title>
+            <Title>{subjectsCount}</Title>
             <Paragraph>Subjects</Paragraph>
           </Card.Content>
         </Card>

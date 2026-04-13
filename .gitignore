@@ -42,3 +42,9 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Convex
+convex/_generated/
+
+# build logs
+build-error.log

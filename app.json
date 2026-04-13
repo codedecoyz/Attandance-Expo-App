@@ -45,19 +45,16 @@
         }
       ],
       [
-        "expo-barcode-scanner",
-        {
-          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera."
-        }
-      ],
-      [
         "expo-notifications",
         {
           "icon": "./assets/images/splash-icon.png",
           "color": "#4A90E2"
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-image",
+      "expo-sharing",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -68,7 +65,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "your-project-id-here"
+        "projectId": "3f421711-dde4-4bad-98ec-dfacd0c14312"
       }
     }
   }

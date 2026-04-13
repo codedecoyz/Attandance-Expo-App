@@ -1,11 +1,9 @@
+import { useMutation } from 'convex/react';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet } from 'react-native';
-import { Button, TextInput, Title, useTheme } from 'react-native-paper'; // Dropdown would be good for faculty selection, but Input for now
-import { supabase } from '../../../lib/supabase';
-
-// Simple Dropdown substitute if needed, or just use ID/Email entry for faculty
-// For better UX, we should fetch faculty list.
+import { Button, TextInput, Title, useTheme } from 'react-native-paper';
+import { api } from '../../../convex/_generated/api';
 
 export default function AddSubject() {
   const theme = useTheme();
@@ -20,6 +18,8 @@ export default function AddSubject() {
     schedule: '',
   });
 
+  const createSubject = useMutation(api.subjects.createSubject);
+
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -32,31 +32,29 @@ export default function AddSubject() {
 
     setLoading(true);
     try {
-      // 1. Find faculty ID from email
-      const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', formData.facultyEmail)
-      .eq('role', 'faculty')
-      .single();
+      // 1. Find faculty ID from email using the Convex HTTP client
+      const { ConvexHttpClient } = require('convex/browser');
+      const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL || '';
+      const httpClient = new ConvexHttpClient(convexUrl);
 
-      if (userError || !userData) {
+      const facultyUser = await httpClient.query(api.users.getUserByEmail, {
+        email: formData.facultyEmail,
+        role: 'faculty',
+      });
+
+      if (!facultyUser) {
         throw new Error('Faculty not found with this email');
       }
 
-      const facultyId = userData.id;
-
-      // 2. Insert subject
-      const { error: subjectError } = await supabase.from('subjects').insert({
-        subject_code: formData.subjectCode,
-        subject_name: formData.subjectName,
+      // 2. Create subject
+      await createSubject({
+        subjectCode: formData.subjectCode,
+        subjectName: formData.subjectName,
         semester: parseInt(formData.semester),
         department: formData.department,
-        faculty_id: facultyId,
-        schedule: formData.schedule,
+        facultyId: facultyUser._id,
+        schedule: formData.schedule || undefined,
       });
-
-      if (subjectError) throw subjectError;
 
       Alert.alert('Success', 'Subject created successfully');
       router.back();

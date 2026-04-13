@@ -1,15 +1,27 @@
-import { supabase } from '../lib/supabase';
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "../convex/_generated/api";
+import type { Id } from "../convex/_generated/dataModel";
+
+const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL || "";
+const httpClient = new ConvexHttpClient(convexUrl);
 
 export const assignmentService = {
-    async createAssignment(subjectId: string, facultyId: string, title: string, totalMarks: number) {
+    async createAssignment(
+        subjectId: string,
+        facultyId: string,
+        title: string,
+        totalMarks: number
+    ) {
         try {
-            const { data, error } = await supabase
-                .from('assignments')
-                .insert({ subject_id: subjectId, faculty_id: facultyId, title, total_marks: totalMarks })
-                .select()
-                .single();
-
-            if (error) throw error;
+            const data = await httpClient.mutation(
+                api.assignments.createAssignment,
+                {
+                    subjectId: subjectId as Id<"subjects">,
+                    facultyId: facultyId as Id<"users">,
+                    title,
+                    totalMarks,
+                }
+            );
             return { data, error: null };
         } catch (error: any) {
             return { data: null, error: error.message };
@@ -18,13 +30,12 @@ export const assignmentService = {
 
     async getAssignmentsBySubject(subjectId: string) {
         try {
-            const { data, error } = await supabase
-                .from('assignments')
-                .select('*')
-                .eq('subject_id', subjectId)
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
+            const data = await httpClient.query(
+                api.assignments.getAssignmentsBySubject,
+                {
+                    subjectId: subjectId as Id<"subjects">,
+                }
+            );
             return { data, error: null };
         } catch (error: any) {
             return { data: null, error: error.message };
@@ -33,45 +44,56 @@ export const assignmentService = {
 
     async getFacultyAssignments(facultyId: string) {
         try {
-            const { data, error } = await supabase
-                .from('assignments')
-                .select('*, subjects(subject_code, subject_name)')
-                .eq('faculty_id', facultyId)
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
+            const data = await httpClient.query(
+                api.assignments.getFacultyAssignments,
+                {
+                    facultyId: facultyId as Id<"users">,
+                }
+            );
             return { data, error: null };
         } catch (error: any) {
             return { data: null, error: error.message };
         }
     },
 
-    async addMarks(assignmentId: string, studentId: string, marksObtained: number, remarks?: string) {
+    async addMarks(
+        assignmentId: string,
+        studentId: string,
+        marksObtained: number,
+        remarks?: string
+    ) {
         try {
-            const { data, error } = await supabase
-                .from('assignment_marks')
-                .upsert(
-                    { assignment_id: assignmentId, student_id: studentId, marks_obtained: marksObtained, remarks },
-                    { onConflict: 'assignment_id,student_id' }
-                )
-                .select()
-                .single();
-
-            if (error) throw error;
+            const data = await httpClient.mutation(api.assignments.addMarks, {
+                assignmentId: assignmentId as Id<"assignments">,
+                studentId: studentId as Id<"users">,
+                marksObtained,
+                remarks,
+            });
             return { data, error: null };
         } catch (error: any) {
             return { data: null, error: error.message };
         }
     },
 
-    async addBulkMarks(marks: { assignment_id: string; student_id: string; marks_obtained: number; remarks?: string }[]) {
+    async addBulkMarks(
+        marks: {
+            assignment_id: string;
+            student_id: string;
+            marks_obtained: number;
+            remarks?: string;
+        }[]
+    ) {
         try {
-            const { data, error } = await supabase
-                .from('assignment_marks')
-                .upsert(marks, { onConflict: 'assignment_id,student_id' })
-                .select();
+        const convexMarks = marks.map((m) => ({
+            assignmentId: m.assignment_id as Id<"assignments">,
+            studentId: m.student_id as Id<"users">,
+            marksObtained: m.marks_obtained,
+            remarks: m.remarks,
+        }));
 
-            if (error) throw error;
+            const data = await httpClient.mutation(api.assignments.addBulkMarks, {
+                marks: convexMarks,
+            });
             return { data, error: null };
         } catch (error: any) {
             return { data: null, error: error.message };
@@ -80,38 +102,13 @@ export const assignmentService = {
 
     async getMarksForAssignment(assignmentId: string) {
         try {
-            const { data, error } = await supabase
-                .from('assignment_marks')
-                .select('*')
-                .eq('assignment_id', assignmentId)
-                .order('marks_obtained', { ascending: false });
-
-            if (error) throw error;
-
-            // Get student names
-            const marksWithNames = await Promise.all(
-                (data || []).map(async (mark: any) => {
-                    const { data: userData } = await supabase
-                        .from('users')
-                        .select('full_name')
-                        .eq('id', mark.student_id)
-                        .single();
-
-                    const { data: studentData } = await supabase
-                        .from('students')
-                        .select('roll_number')
-                        .eq('id', mark.student_id)
-                        .single();
-
-                    return {
-                        ...mark,
-                        student_name: userData?.full_name || '',
-                        roll_number: studentData?.roll_number || '',
-                    };
-                })
-            );
-
-            return { data: marksWithNames, error: null };
+        const data = await httpClient.query(
+            api.assignments.getMarksForAssignment,
+            {
+                assignmentId: assignmentId as Id<"assignments">,
+            }
+        );
+            return { data, error: null };
         } catch (error: any) {
             return { data: null, error: error.message };
         }
@@ -119,13 +116,9 @@ export const assignmentService = {
 
     async getStudentMarks(studentId: string) {
         try {
-            const { data, error } = await supabase
-                .from('assignment_marks')
-                .select('*, assignments(id, title, total_marks, subject_id, subjects(subject_code, subject_name))')
-                .eq('student_id', studentId)
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
+            const data = await httpClient.query(api.assignments.getStudentMarks, {
+                studentId: studentId as Id<"users">,
+            });
             return { data, error: null };
         } catch (error: any) {
             return { data: null, error: error.message };

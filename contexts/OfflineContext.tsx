@@ -1,9 +1,14 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '../lib/supabase';
+import NetInfo from '@react-native-community/netinfo';
+import { ConvexHttpClient } from 'convex/browser';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { api } from '../convex/_generated/api';
+import type { Id } from '../convex/_generated/dataModel';
 import { SYNC_QUEUE_KEY } from '../lib/constants';
-import type { OfflineSyncQueue, OfflineQueueItem } from '../types/models';
+import type { OfflineQueueItem, OfflineSyncQueue } from '../types/models';
+
+const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL || '';
+const httpClient = new ConvexHttpClient(convexUrl);
 
 interface OfflineContextType {
   isOnline: boolean;
@@ -113,39 +118,38 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       for (const item of unsyncedItems) {
         try {
           if (item.type === 'attendance_mark') {
-            // Check for conflict (existing record)
-            const { data: existing } = await supabase
-              .from('attendance_records')
-              .select('id')
-              .eq('student_id', item.data.student_id)
-              .eq('subject_id', item.data.subject_id)
-              .eq('date', item.data.date)
-              .single();
+            // Check for conflict (existing record) via Convex
+            const exists = await httpClient.query(
+              api.attendance.checkAttendanceExists,
+              {
+                studentId: item.data.student_id as Id<"users">,
+                subjectId: item.data.subject_id as Id<"subjects">,
+                date: item.data.date,
+              }
+            );
 
-            if (existing) {
+            if (exists) {
               // Conflict: server has record, mark as synced but don't upload
               item.synced = true;
               console.log('Conflict detected, server data takes precedence');
             } else {
-              // No conflict: upload to server
-              const { error } = await supabase
-                .from('attendance_records')
-                .insert({
-                  student_id: item.data.student_id,
-                  subject_id: item.data.subject_id,
-                  date: item.data.date,
-                  status: item.data.status,
-                  marked_by: item.data.marked_by,
-                  notes: item.data.notes,
-                });
-
-              if (error) {
-                // Increment retries on error
-                item.retries += 1;
-                console.error('Error syncing item:', error);
-              } else {
-                // Mark as synced
+              // No conflict: upload to server via Convex mutation
+              try {
+                await httpClient.mutation(
+                  api.attendance.insertAttendanceRecord,
+                  {
+                    studentId: item.data.student_id as Id<"users">,
+                    subjectId: item.data.subject_id as Id<"subjects">,
+                    date: item.data.date,
+                    status: item.data.status as "present" | "absent" | "late" | "excused",
+                    markedBy: item.data.marked_by as Id<"users">,
+                    notes: item.data.notes,
+                  }
+                );
                 item.synced = true;
+              } catch (err) {
+                item.retries += 1;
+                console.error('Error syncing item:', err);
               }
             }
           }
